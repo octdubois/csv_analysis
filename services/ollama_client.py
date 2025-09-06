@@ -14,6 +14,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+class OllamaClientError(Exception):
+    """Custom exception for Ollama client errors."""
+    pass
+
+
+def _extract_error_message(response: requests.Response) -> str:
+    """Extract detailed error message from an HTTP response."""
+    try:
+        data = response.json()
+        return data.get("error") or response.text
+    except ValueError:
+        return response.text
+
+
 class OllamaClient:
     """Client for interacting with local Ollama instance."""
     
@@ -76,36 +90,41 @@ class OllamaClient:
         
         try:
             response = self.session.post(url, json=payload, stream=True)
-            response.raise_for_status()
-            
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as http_err:
+                message = _extract_error_message(http_err.response)
+                logger.error(f"Ollama API error: {message}")
+                raise OllamaClientError(message) from http_err
+
             full_response = ""
             start_time = time.time()
-            
+
             for line in response.iter_lines():
                 if line:
                     try:
                         data = json.loads(line.decode('utf-8'))
-                        
+
                         if 'response' in data:
                             chunk = data['response']
                             full_response += chunk
                             yield chunk
-                        
+
                         if data.get('done', False):
                             break
-                            
+
                     except json.JSONDecodeError:
                         continue
-            
+
             elapsed_time = time.time() - start_time
             logger.info(f"Generated {len(full_response)} characters in {elapsed_time:.2f}s")
-            
+
         except requests.exceptions.RequestException as e:
             logger.error(f"Request failed: {e}")
-            yield f"Error: Failed to communicate with Ollama: {str(e)}"
+            raise OllamaClientError(f"Failed to communicate with Ollama: {e}") from e
         except Exception as e:
             logger.error(f"Generation failed: {e}")
-            yield f"Error: {str(e)}"
+            raise OllamaClientError(str(e)) from e
     
     def generate_sync(self, prompt: str, system: str = "", model: str = "llama3.1:8b",
                       temperature: float = 0.2, top_p: float = 0.9,
@@ -140,17 +159,22 @@ class OllamaClient:
         
         try:
             response = self.session.post(url, json=payload)
-            response.raise_for_status()
-            
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as http_err:
+                message = _extract_error_message(http_err.response)
+                logger.error(f"Ollama API error: {message}")
+                raise OllamaClientError(message) from http_err
+
             data = response.json()
             return data.get('response', '')
-            
+
         except requests.exceptions.RequestException as e:
             logger.error(f"Request failed: {e}")
-            return f"Error: Failed to communicate with Ollama: {str(e)}"
+            raise OllamaClientError(f"Failed to communicate with Ollama: {e}") from e
         except Exception as e:
             logger.error(f"Generation failed: {e}")
-            return f"Error: {str(e)}"
+            raise OllamaClientError(str(e)) from e
     
     def embeddings(self, text: str, model: str = "llama3.1:8b") -> Optional[List[float]]:
         """
@@ -172,17 +196,22 @@ class OllamaClient:
         
         try:
             response = self.session.post(url, json=payload)
-            response.raise_for_status()
-            
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as http_err:
+                message = _extract_error_message(http_err.response)
+                logger.error(f"Embeddings request failed: {message}")
+                raise OllamaClientError(message) from http_err
+
             data = response.json()
             return data.get('embedding', [])
-            
+
         except requests.exceptions.RequestException as e:
             logger.error(f"Embeddings request failed: {e}")
-            return None
+            raise OllamaClientError(f"Failed to communicate with Ollama: {e}") from e
         except Exception as e:
             logger.error(f"Embeddings generation failed: {e}")
-            return None
+            raise OllamaClientError(str(e)) from e
     
     def health_check(self) -> Dict[str, Any]:
         """Perform health check and return status information."""
@@ -222,4 +251,4 @@ def generate_sync(prompt: str, system: str = "", model: str = "llama3.1:8b",
 def embeddings(text: str, model: str = "llama3.1:8b") -> Optional[List[float]]:
     """Convenience function for embeddings."""
     client = OllamaClient()
-    return client.embeddings(text, model) 
+    return client.embeddings(text, model)
