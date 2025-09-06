@@ -16,16 +16,16 @@ logger = logging.getLogger(__name__)
 
 class OllamaClient:
     """Client for interacting with local Ollama instance."""
-    
-    def __init__(self, base_url: str = "http://localhost:11434"):
+
+    def __init__(self, base_url: str = "http://localhost:11434", timeout: int = 30):
         self.base_url = base_url
         self.session = requests.Session()
-        self.session.timeout = 30
+        self.timeout = timeout
     
     def is_available(self) -> bool:
         """Check if Ollama is running and accessible."""
         try:
-            response = self.session.get(f"{self.base_url}/api/tags")
+            response = self.session.get(f"{self.base_url}/api/tags", timeout=self.timeout)
             return response.status_code == 200
         except Exception as e:
             logger.warning(f"Ollama not available: {e}")
@@ -34,7 +34,7 @@ class OllamaClient:
     def get_models(self) -> List[Dict[str, Any]]:
         """Get list of available models."""
         try:
-            response = self.session.get(f"{self.base_url}/api/tags")
+            response = self.session.get(f"{self.base_url}/api/tags", timeout=self.timeout)
             if response.status_code == 200:
                 data = response.json()
                 return data.get("models", [])
@@ -75,7 +75,7 @@ class OllamaClient:
         }
         
         try:
-            response = self.session.post(url, json=payload, stream=True)
+            response = self.session.post(url, json=payload, stream=True, timeout=self.timeout)
             response.raise_for_status()
             
             full_response = ""
@@ -139,7 +139,7 @@ class OllamaClient:
         }
         
         try:
-            response = self.session.post(url, json=payload)
+            response = self.session.post(url, json=payload, timeout=self.timeout)
             response.raise_for_status()
             
             data = response.json()
@@ -171,7 +171,7 @@ class OllamaClient:
         }
         
         try:
-            response = self.session.post(url, json=payload)
+            response = self.session.post(url, json=payload, timeout=self.timeout)
             response.raise_for_status()
             
             data = response.json()
@@ -222,4 +222,4 @@ def generate_sync(prompt: str, system: str = "", model: str = "llama3.1:8b",
 def embeddings(text: str, model: str = "llama3.1:8b") -> Optional[List[float]]:
     """Convenience function for embeddings."""
     client = OllamaClient()
-    return client.embeddings(text, model) 
+    return client.embeddings(text, model)
