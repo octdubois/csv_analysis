@@ -219,11 +219,16 @@ Please generate an analysis plan using only the allowed functions."""
             system=system_prompt,
             model=st.session_state.get('selected_model', 'llama3.1:8b')
         )
-        
+
         # DEBUG: Show the raw response
         st.write("🔍 **Debug - Raw LLM Response:**")
         st.code(response)
-        
+
+        # Check for communication errors before attempting JSON parsing
+        if response.startswith("Error:") or "Failed to communicate" in response:
+            st.error(response)
+            return {"error": response}
+
         # Try multiple JSON extraction methods
         json_str = None
         
