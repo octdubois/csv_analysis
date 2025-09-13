@@ -1,0 +1,22 @@
+[project]
+name = "csvi"
+version = "0.1.0"
+description = "CSV Insight analytics runner"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas",
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "hypothesis"]
+
+[project.scripts]
+csvi = "csvi.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
